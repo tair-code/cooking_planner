@@ -164,16 +164,34 @@ function range(){
   else{s=monday(a);e=addDays(s,ui.mode==='2w'?13:6)}
   const out=[];for(let d=s;d<=e;d=addDays(d,1))out.push(d);return out;
 }
+// One product under different wording ("масло растопленное", "Яйца", "Сахар (я беру 100 г)") = one line in shopping and prices.
+const SYN={'масло':'сливочное масло','масло сливочное':'сливочное масло','белый сахар':'сахар','сахар белый':'сахар','сахар-песок':'сахар','мука пшеничная':'мука','пшеничная мука':'мука',
+  'сливки 33%':'сливки','сливки от 30%':'сливки','сливки 30%':'сливки','сливки 35%':'сливки','минеральная вода jaminca':'минеральная вода Jamnica','пищевая сода':'сода','сгущенное молоко':'сгущенка',
+  'яйца':'яйцо','яйцо куриное':'яйцо','яйца куриные':'яйцо','желтки':'желток','белки':'белок','лимоны':'лимон','лаймы':'лайм','апельсины':'апельсин','яблоки':'яблоко','бананы':'банан',
+  'помидоры':'помидор','томаты':'помидор','огурцы':'огурец','луковица':'лук','луковицы':'лук','лук репчатый':'лук','репчатый лук':'лук','морковка':'морковь','картошка':'картофель',
+  'зубчик чеснока':'чеснок','зубчики чеснока':'чеснок','креветки':'креветка','грибы':'шампиньоны','орехи грецкие':'грецкие орехи'};
+function prod(n){const raw=String(n||'').trim();
+  const s=raw.replace(/\(.*?\)/g,' ').split(',')[0].replace(/комнатной температуры/gi,' ').split(/\s+/)
+    .filter(w=>w&&!/^(растоплен|т[её]пл|горяч|холодн|размягч|мягк|охлажд|свеж)/i.test(w)).join(' ')||raw;
+  return SYN[s.toLowerCase().replace(/ё/g,'е')]||s}
+const pkey=n=>prod(n).toLowerCase().replace(/ё/g,'е'),pname=n=>{const s=prod(n);return s.charAt(0).toUpperCase()+s.slice(1)};
+// merges price entries saved under old spellings into the product key
+function normPrices(){let ch=0;for(const [k,p] of Object.entries(S.prices||{})){const nk=pkey(p.name||k);if(nk===k)continue;
+  if(!(S.prices[nk]?.price>0))S.prices[nk]={...p,name:pname(p.name||k)};delete S.prices[k];ch=1}return ch}
 function shopping(days,st=S){
   const m={};
   for(const d of days){const p=st.plan[iso(d)];if(!p)continue;
     for(const [k] of MEALS)for(const rid of p[k]||[]){const r=st.recipes.find(x=>x.id===rid);if(!r)continue;
-      for(const i of r.ingredients){const name=(i.name||'').trim();if(!name)continue;
-        const [b,f]=BASE[i.unit]||[i.unit||'',1];const key=name.toLowerCase()+'|'+b;const q=num(i.qty);
+      for(const i of r.ingredients){if(!(i.name||'').trim())continue;const name=pname(i.name);
+        const [b,f]=BASE[i.unit]||[i.unit||'',1];const key=pkey(i.name)+'|'+b;const q=num(i.qty);
         m[key]??={key,name,b,qty:0,from:new Set()};if(!isNaN(q))m[key].qty+=q*f;m[key].from.add(r.name)}}}
-  return Object.values(m).map(v=>({...v,cost:cost(v,st)})).sort((a,b)=>a.name.localeCompare(b.name,'ru'));
+  // one row per product; different units ("г", "ст. л.", "по вкусу") are listed together
+  const g={};for(const v of Object.values(m)){const k=v.key.split('|')[0],c=cost(v,st);
+    const r=g[k]??={key:k,name:v.name,parts:[],from:new Set(),cost:null};r.parts.push(v);v.from.forEach(x=>r.from.add(x));if(c!=null)r.cost=(r.cost||0)+c}
+  for(const r of Object.values(g))r.q=[...new Set(r.parts.map(fmtQty))].join(' + ');
+  return Object.values(g).sort((a,b)=>a.name.localeCompare(b.name,'ru'));
 }
-function cost(v,st=S){const p=st.prices[v.name.toLowerCase()];if(!p||!(p.price>0)||PER[v.b]!==p.per||!v.qty)return null;return v.b==='pcs'?v.qty*p.price:v.qty/1000*p.price}
+function cost(v,st=S){const p=st.prices[pkey(v.name)];if(!p||!(p.price>0)||PER[v.b]!==p.per||!v.qty)return null;return v.b==='pcs'?v.qty*p.price:v.qty/1000*p.price}
 function fmtQty(v){const r=x=>+x.toFixed(2);
   if(v.b==='g')return v.qty>=1000?r(v.qty/1000)+' кг':Math.round(v.qty)+' г';
   if(v.b==='ml')return v.qty>=1000?r(v.qty/1000)+' л':Math.round(v.qty)+' мл';
@@ -181,9 +199,9 @@ function fmtQty(v){const r=x=>+x.toFixed(2);
   return (v.qty?r(v.qty)+' ':'')+v.b}
 
 // self-check of the shopping maths
-{const t={recipes:[{id:'a',name:'A',ingredients:[{name:'Мука',qty:'500',unit:'г'},{name:'мука',qty:'1,5',unit:'кг'},{name:'Яйца',qty:2,unit:'шт'}]}],plan:{'2026-01-05':{b:['a'],d:['a']}},prices:{'мука':{price:100,per:'кг'}}};
+{const t={recipes:[{id:'a',name:'A',ingredients:[{name:'Мука',qty:'500',unit:'г'},{name:'мука',qty:'1,5',unit:'кг'},{name:'Яйца',qty:2,unit:'шт'},{name:'Сливочное масло растопленное',qty:50,unit:'г'},{name:'Масло (комнатной температуры)',qty:100,unit:'г'}]}],plan:{'2026-01-05':{b:['a'],d:['a']}},prices:{'мука':{price:100,per:'кг'}}};
  console.assert(groups([{g:'Тесто'},{g:'Тесто'},{}]).length===2,'groups self-check failed');
- const l=shopping([new Date(2026,0,5)],t);console.assert(l.length===2&&l[0].qty===4000&&l[0].cost===400&&l[1].qty===4,'shopping self-check failed',l)}
+ const l=shopping([new Date(2026,0,5)],t);console.assert(l.length===3&&l[0].q==='4 кг'&&l[0].cost===400&&l[1].name==='Сливочное масло'&&l[1].q==='300 г'&&l[2].name==='Яйцо'&&l[2].q==='4 шт','shopping self-check failed',l)}
 
 let db=null,tSave;
 const setSaved=t=>{const e=$('#sv');if(e)e.textContent=t};
@@ -236,14 +254,14 @@ function vRecipes(){
 function vShop(){
   const list=shopping(range()),total=list.reduce((s,v)=>s+(v.cost||0),0);
   return `<h1>Список покупок</h1>${periodBar()}${list.length?`<div class="scroll"><table><thead><tr><th></th><th>Продукт</th><th class="num">Сколько</th><th class="num">Цена</th></tr></thead><tbody>
-  ${list.map(v=>`<tr class="${S.checked[v.key]?'done':''}"><td><input type="checkbox" data-chk="${esc(v.key)}" ${S.checked[v.key]?'checked':''} aria-label="Куплено: ${esc(v.name)}"></td><td><span class="nm">${esc(v.name)}</span><div class="meta">${esc([...v.from].join(', '))}</div></td><td class="num">${esc(fmtQty(v))}</td><td class="num">${v.cost==null?'<span class="meta">нет цены</span>':money(v.cost)}</td></tr>`).join('')}
+  ${list.map(v=>`<tr class="${S.checked[v.key]?'done':''}"><td><input type="checkbox" data-chk="${esc(v.key)}" ${S.checked[v.key]?'checked':''} aria-label="Куплено: ${esc(v.name)}"></td><td><span class="nm">${esc(v.name)}</span><div class="meta">${esc([...v.from].join(', '))}</div></td><td class="num">${esc(v.q)}</td><td class="num">${v.cost==null?'<span class="meta">нет цены</span>':money(v.cost)}</td></tr>`).join('')}
   </tbody><tfoot><tr><th></th><th>Итого</th><th></th><th class="num big" style="font-size:32px">${money(total)}</th></tr></tfoot></table></div>
   <div class="bar" style="margin-top:12px"><button data-go="prices">Указать цены</button><button data-uncheck>Снять отметки</button></div>`
   :'<div class="empty">На этот период в меню ничего нет. Добавьте блюда в планере.</div>'}`;
 }
 function vPrices(){
   const names={};
-  for(const r of S.recipes)for(const i of r.ingredients){const n=(i.name||'').trim();if(n&&!names[n.toLowerCase()])names[n.toLowerCase()]={n,per:PER[(BASE[i.unit]||[])[0]]||'кг'}}
+  for(const r of S.recipes)for(const i of r.ingredients){const n=(i.name||'').trim();if(n&&!names[pkey(n)])names[pkey(n)]={n:pname(n),per:PER[(BASE[i.unit]||[])[0]]||'кг'}}
   for(const [k,p] of Object.entries(S.prices))names[k]??={n:p.name||k,per:p.per};
   const rows=Object.entries(names).sort((a,b)=>a[1].n.localeCompare(b[1].n,'ru'));
   return `<div class="bar"><h1>Цены на продукты</h1><span class="grow"></span><label class="meta">Валюта <select id="cur">${[...new Set([S.currency,...CUR])].map(c=>`<option ${c===S.currency?'selected':''}>${esc(c)}</option>`).join('')}</select></label></div>
@@ -443,7 +461,7 @@ document.addEventListener('change',e=>{const t=e.target,d=t.dataset;
   else if(t.id==='rsf'&&t.files[0])t.files[0].text().then(x=>{$('#rst').value=x;$('[data-rs]').click()});
 });
 document.addEventListener('submit',e=>{if(e.target.id==='setf'){e.preventDefault();S.settings=Object.fromEntries(new FormData(e.target));save();$('#sst').textContent='Сохранено';return}
-  if(e.target.id!=='addp')return;e.preventDefault();const n=e.target.n.value.trim();if(!n)return;S.prices[n.toLowerCase()]??={name:n,price:null,per:'кг'};save();render()});
+  if(e.target.id!=='addp')return;e.preventDefault();const n=e.target.n.value.trim();if(!n)return;S.prices[pkey(n)]??={name:pname(n),price:null,per:'кг'};save();render()});
 // drag & drop
 document.addEventListener('dragstart',e=>{const c=e.target.closest?.('.chip');if(!c)return;e.dataTransfer.setData('text/plain',JSON.stringify({rid:c.dataset.rid,from:c.dataset.from||''}));e.dataTransfer.effectAllowed='copyMove'});
 document.addEventListener('dragover',e=>{const s=e.target.closest?.('.slot');if(!s||!ui.edit)return;e.preventDefault();s.classList.add('over')});
@@ -458,7 +476,7 @@ const SEED=[{"id":"ac2aff13f4014d3d9554a827e4ae22a6","name":"Медовик","ca
 // Adds Notion recipes once; S.seeded remembers them so a recipe the user deletes does not come back.
 function seed(){const done=new Set(S.seeded||[]);let n=0;
   for(const r of SEED){if(done.has(r.id))continue;done.add(r.id);if(!recipe(r.id)){S.recipes.push(structuredClone(r));n++}}
-  S.seeded=[...done];if(n)save();return n}
+  S.seeded=[...done];if(normPrices()|n)save();return n}
 async function boot(){
   if(NATIVE){if(window.__STATE__)S={...S,...window.__STATE__};seed();render();savedMsg='Данные хранятся на телефоне';return setSaved(savedMsg)}
   try{const l=localStorage.getItem('cooking-planner');if(l)S={...S,...JSON.parse(l)}}catch{}
