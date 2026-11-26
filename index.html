@@ -1,0 +1,442 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Планер">
+<meta name="theme-color" content="#dde7d3">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<script>window.__PWA__=true;if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))</script>
+</head><body>
+<title>Кулинарный планер</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* VOICE everyday, calm
+   IDEA a paper planner page on a sage tablet: tabbed edge, grid paper, handwritten entries
+   PICTURE the week board itself: day cards with breakfast/lunch/dinner lines and recipe stickers
+   COLOUR sage frame, off-white grid paper, ink green-grey; mustard/sage/lavender meal tags
+   TYPE Caveat for headings and entries + Nunito for UI
+   LAYOUT laptop: board left, recipes+basket rail right; phone: tabs, board in 2 cols, rail below */
+:root,:root[data-theme]{color-scheme:light;--frame:#dde7d3;--frame2:#cbd9bf;--paper:#f7f5ef;--grid:rgba(130,150,120,.11);--ink:#4f5a4c;--mut:#87917f;--line:#d9e0d1;--card:#fcfbf7;--acc:#8fab83;--b:#e6c67e;--l:#a9c49b;--d:#c3b2d8;--warn:#c98a6b}
+*{box-sizing:border-box;min-width:0}
+html,body{min-height:100%}
+[hidden]{display:none!important}
+body{background:var(--frame);color:var(--ink);font:15px/1.45 Nunito,system-ui,sans-serif;overflow-x:clip;padding:calc(14px + env(safe-area-inset-top,0px)) max(2vw,10px,env(safe-area-inset-right,0px)) calc(24px + env(safe-area-inset-bottom,0px)) max(2vw,10px,env(safe-area-inset-left,0px))}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:6px 14px;min-height:36px}
+button:hover{border-color:var(--acc)}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.pri{background:var(--acc);color:#fff;border-color:var(--acc);font-weight:700}
+input,select,textarea{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:7px 10px;font-size:16px;min-height:38px}
+.top{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;max-width:1320px;margin:0 auto}
+.tabs{display:flex;align-items:center;gap:4px;background:var(--frame2);border-radius:22px 22px 0 0;padding:8px 14px 6px;flex-wrap:wrap}
+.logo{width:30px;height:30px;border-radius:50%;background:var(--paper);display:grid;place-items:center;font-weight:800;margin-right:6px}
+.tab{border:0;background:none;text-decoration:underline;text-underline-offset:4px;color:var(--mut);padding:4px 10px;min-height:34px;border-radius:12px}
+.tab[aria-selected=true]{color:var(--ink);background:var(--paper);text-decoration:none;font-weight:700}
+.date{display:flex;align-items:center;gap:10px;padding-bottom:6px}
+.date b{font:700 46px/1 Caveat,cursive;letter-spacing:-.01em}
+.date span{background:var(--paper);border-radius:14px;padding:2px 16px;font:700 34px/1.1 Caveat,cursive;color:var(--acc)}
+.wk{display:flex;gap:6px;justify-content:flex-end;padding-bottom:8px}
+.wk button{min-height:30px;padding:2px 10px;font-size:12px;background:var(--paper);border-color:transparent;color:var(--mut)}
+.wk button.on{border-color:var(--acc);color:var(--ink);font-weight:700}
+.paper{max-width:1320px;margin:0 auto;background-color:var(--paper);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:18px 18px;border-radius:0 26px 26px 26px;padding:clamp(14px,2.4vw,28px);box-shadow:0 1px 0 var(--frame2)}
+h1,h2{font-family:Caveat,cursive;font-weight:700;margin:0;line-height:1.05}
+h1{font-size:40px}h2{font-size:28px}
+.bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.bar .grow{flex:1}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.seg button{border:0;border-radius:0;background:none}
+.seg button.on{background:var(--acc);color:#fff}
+.sv{font-size:13px;color:var(--mut)}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:22px;align-items:start}
+@media(max-width:1200px){.layout{grid-template-columns:minmax(0,1fr)}.rail{position:static;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));align-items:start}}
+.dscroll{overflow-x:auto;padding-bottom:4px}
+.days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
+@media(max-width:560px){.days{grid-template-columns:repeat(7,minmax(84px,1fr))}}
+.day{padding:6px 5px 8px!important;border-radius:12px!important}
+.day{background:color-mix(in srgb,var(--card) 82%,transparent);border:1px solid var(--line);border-radius:16px;padding:8px 10px 10px}
+.day.out{opacity:.5}
+.day.today{border-color:var(--acc);box-shadow:inset 0 0 0 1px var(--acc)}
+.dh{display:flex;justify-content:space-between;align-items:baseline;font:700 19px/1.1 Caveat,cursive}
+.dh small{font:600 12px Nunito,sans-serif;color:var(--mut)}
+.ml{font-size:11px;color:var(--mut);display:flex;align-items:center;gap:5px;margin-top:6px}
+.ml i{width:8px;height:8px;border-radius:50%;display:inline-block}
+.layout:not(.editing) .slot{border-bottom-style:solid}
+.slot{min-height:22px;border-bottom:1.5px dashed var(--line);display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:3px 0}
+.slot.over{background:color-mix(in srgb,var(--acc) 18%,transparent);border-radius:8px}
+.chip{font:600 16px/1.1 Caveat,cursive;background:var(--paper);border:1px solid var(--line);border-left:4px solid var(--l);border-radius:8px;padding:1px 3px 1px 5px;cursor:grab;display:inline-flex;align-items:center;gap:4px;max-width:100%;overflow-wrap:anywhere}
+.chip[data-m=b]{border-left-color:var(--b)}.chip[data-m=d]{border-left-color:var(--d)}
+.chip .x{border:0;background:none;min-height:0;padding:0 2px;color:var(--mut);font:14px Nunito}
+.add{min-height:24px;padding:0 6px;font-size:14px;color:var(--mut);border-style:dashed;background:none}
+.rail{display:grid;gap:16px;position:sticky;top:10px}
+.box{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px}
+.rlist{display:flex;flex-wrap:wrap;gap:6px;max-height:340px;overflow:auto;margin-top:8px}
+.big{font:700 44px/1 Caveat,cursive;color:var(--acc)}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.rc{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px;text-align:left;display:grid;gap:4px;border-top:6px solid var(--l)}
+.rc h2{font-size:26px}
+.meta{font-size:13px;color:var(--mut)}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%}
+td,th{padding:8px 6px;border-bottom:1px dashed var(--line);text-align:left;vertical-align:middle}
+th{font-size:13px;color:var(--mut);font-weight:600}
+.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+tr.done td{opacity:.45;text-decoration:line-through}
+.nm{font:600 21px/1.1 Caveat,cursive}
+.empty{padding:28px;text-align:center;color:var(--mut);border:1.5px dashed var(--line);border-radius:16px}
+.ov{position:fixed;inset:0;background:rgba(30,40,28,.45);display:grid;place-items:center;padding:16px;z-index:9}
+.dlg{background-color:var(--paper);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:18px 18px;border-radius:22px;padding:20px;width:min(680px,100%);max-height:90vh;overflow:auto;display:grid;gap:12px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.row>label{display:grid;gap:3px;font-size:13px;color:var(--mut);flex:1 1 140px}
+.ing{display:grid;grid-template-columns:minmax(0,1fr) 78px 104px 36px;gap:6px;margin-bottom:6px}
+.ing button{padding:0}
+.grp{display:grid;grid-template-columns:minmax(0,1fr) 36px;gap:6px;margin:10px 0 6px}
+.grp input{font-weight:700;background:color-mix(in srgb,var(--b) 25%,var(--card))}
+.grp button{padding:0}
+.chip{flex-wrap:wrap}
+.chip img{flex-basis:100%;width:100%;height:52px;object-fit:cover;border-radius:5px}
+.rc img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:12px;margin-bottom:4px}
+.hero{width:100%;max-height:260px;object-fit:cover;border-radius:16px}
+.thumb{width:64px;height:64px;object-fit:cover;border-radius:10px}
+.cat{margin:18px 0 8px}.cat small{font:600 13px Nunito,sans-serif;color:var(--mut)}
+.tag{background:color-mix(in srgb,var(--l) 35%,var(--card));border-radius:999px;padding:1px 10px;color:var(--ink);font-weight:600}
+h3{margin:12px 0 0;font:700 22px/1.1 Caveat,cursive;color:var(--acc)}
+.imp{background:color-mix(in srgb,var(--l) 22%,var(--card));border-radius:16px;padding:12px;display:grid;gap:8px}
+.st{font-size:14px;color:var(--mut)}.st.err{color:var(--warn)}
+ol{padding-left:20px;margin:0}
+@media(max-width:600px){.tabs{padding:6px 8px}.tab{padding:4px 6px}.logo{display:none}.date b{font-size:36px}.ing{grid-template-columns:minmax(0,1fr) 64px 88px 32px}}
+@media(prefers-reduced-motion:no-preference){.slot,.chip{transition:background .15s}}
+</style>
+
+<div class="top">
+  <nav class="tabs" role="tablist">
+    <span class="logo">M</span>
+    <button class="tab" data-t="plan" role="tab">Планер</button>
+    <button class="tab" data-t="recipes" role="tab">Рецепты</button>
+    <button class="tab" data-t="shop" role="tab">Покупки</button>
+    <button class="tab" data-t="prices" role="tab">Цены</button>
+    <button class="tab" data-t="settings" role="tab" id="tset" hidden>Настройки</button>
+  </nav>
+  <div>
+    <div class="date"><b id="mon"></b><span id="dnum"></span></div>
+    <div class="wk" id="wk"></div>
+  </div>
+</div>
+<main class="paper" id="view"></main>
+<div class="ov" id="ov" hidden><div class="dlg" id="dlg" role="dialog" aria-modal="true"></div></div>
+
+<script>
+{
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const NATIVE=window.webkit?.messageHandlers?.native; // set only inside the iPhone app
+const PWA=window.__PWA__,LOCAL=NATIVE||PWA; // LOCAL: runs outside Claude, keys in Settings
+const nat=m=>NATIVE.postMessage(m);
+const http=(url,o={})=>nat({op:'http',url,method:o.method||'GET',headers:o.headers||{},body:o.body??null});
+const use=n=>window.claude?.use?window.claude.use(n).catch(()=>null):Promise.resolve(null);
+const UNITS=['г','кг','мл','л','шт','ст.л.','ч.л.','щепотка','по вкусу'];
+const CATS=['Выпечка','Салат','Суп','Жаркое','Горячее','Гарнир','Завтрак','Закуска','Десерт','Соус','Напиток','Другое'];
+const groups=ings=>ings.reduce((a,i)=>{const g=i.g||'';(a.at(-1)?.[0]===g?a.at(-1)[1]:(a.push([g,[]]),a.at(-1)[1])).push(i);return a},[]);
+const MEALS=[['b','Завтрак','var(--b)'],['l','Обед','var(--l)'],['d','Ужин','var(--d)']];
+const CUR=['₫','₽','$','€','₸','₴','₾','£','₺','zł','Br','сум','֏','AED'];
+const BASE={'г':['g',1],'кг':['g',1000],'мл':['ml',1],'л':['ml',1000],'шт':['pcs',1]};
+const PER={g:'кг',ml:'л',pcs:'шт'};
+const MON=['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+const WD=['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+let S={recipes:[],plan:{},prices:{},currency:'₫',checked:{}};
+const ui={edit:false,tab:'plan',mode:'week',anchor:new Date(),q:''};
+const iso=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const addDays=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x};
+const monday=d=>{const x=addDays(d,-((d.getDay()+6)%7));x.setHours(0,0,0,0);return x};
+const num=v=>parseFloat(String(v??'').replace(',','.'));
+const money=v=>new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(v)+' '+S.currency;
+const recipe=id=>S.recipes.find(r=>r.id===id);
+
+function range(){
+  const a=ui.anchor;let s,e;
+  if(ui.mode==='month'){s=monday(new Date(a.getFullYear(),a.getMonth(),1));e=addDays(monday(new Date(a.getFullYear(),a.getMonth()+1,0)),6)}
+  else{s=monday(a);e=addDays(s,ui.mode==='2w'?13:6)}
+  const out=[];for(let d=s;d<=e;d=addDays(d,1))out.push(d);return out;
+}
+function shopping(days,st=S){
+  const m={};
+  for(const d of days){const p=st.plan[iso(d)];if(!p)continue;
+    for(const [k] of MEALS)for(const rid of p[k]||[]){const r=st.recipes.find(x=>x.id===rid);if(!r)continue;
+      for(const i of r.ingredients){const name=(i.name||'').trim();if(!name)continue;
+        const [b,f]=BASE[i.unit]||[i.unit||'',1];const key=name.toLowerCase()+'|'+b;const q=num(i.qty);
+        m[key]??={key,name,b,qty:0,from:new Set()};if(!isNaN(q))m[key].qty+=q*f;m[key].from.add(r.name)}}}
+  return Object.values(m).map(v=>({...v,cost:cost(v,st)})).sort((a,b)=>a.name.localeCompare(b.name,'ru'));
+}
+function cost(v,st=S){const p=st.prices[v.name.toLowerCase()];if(!p||!(p.price>0)||PER[v.b]!==p.per||!v.qty)return null;return v.b==='pcs'?v.qty*p.price:v.qty/1000*p.price}
+function fmtQty(v){const r=x=>+x.toFixed(2);
+  if(v.b==='g')return v.qty>=1000?r(v.qty/1000)+' кг':Math.round(v.qty)+' г';
+  if(v.b==='ml')return v.qty>=1000?r(v.qty/1000)+' л':Math.round(v.qty)+' мл';
+  if(v.b==='pcs')return r(v.qty)+' шт';
+  return (v.qty?r(v.qty)+' ':'')+v.b}
+
+// self-check of the shopping maths
+{const t={recipes:[{id:'a',name:'A',ingredients:[{name:'Мука',qty:'500',unit:'г'},{name:'мука',qty:'1,5',unit:'кг'},{name:'Яйца',qty:2,unit:'шт'}]}],plan:{'2026-01-05':{b:['a'],d:['a']}},prices:{'мука':{price:100,per:'кг'}}};
+ console.assert(groups([{g:'Тесто'},{g:'Тесто'},{}]).length===2,'groups self-check failed');
+ const l=shopping([new Date(2026,0,5)],t);console.assert(l.length===2&&l[0].qty===4000&&l[0].cost===400&&l[1].qty===4,'shopping self-check failed',l)}
+
+let db=null,tSave;
+const setSaved=t=>{const e=$('#sv');if(e)e.textContent=t};
+let savedMsg='';
+function save(){
+  try{localStorage.setItem('cooking-planner',JSON.stringify(S))}catch(e){if(PWA){savedMsg='Не сохранилось: память заполнена, удалите лишние картинки';return setSaved(savedMsg)}}
+  clearTimeout(tSave);savedMsg='Сохраняю…';setSaved(savedMsg);
+  tSave=setTimeout(async()=>{
+    if(NATIVE){try{await nat({op:'save',json:JSON.stringify(S)});savedMsg='Сохранено на телефоне'}catch(e){savedMsg='Не удалось сохранить: '+e.message}return setSaved(savedMsg)}
+    if(!db){savedMsg=PWA?'Сохранено на этом телефоне':'Сохранено в этом браузере';return setSaved(savedMsg)}
+    try{await db.doc('planner/state').set({json:JSON.stringify(S),at:new Date().toISOString()});savedMsg='Сохранено'}
+    catch(e){savedMsg='Не удалось сохранить ('+(e.code||'ошибка')+'), копия в браузере'}
+    setSaved(savedMsg)},700);
+}
+
+function header(){
+  const t=new Date();$('#mon').textContent=MON[t.getMonth()]+' /';$('#dnum').textContent=String(t.getDate()).padStart(2,'0');
+  const a=ui.anchor,first=monday(new Date(a.getFullYear(),a.getMonth(),1)),last=new Date(a.getFullYear(),a.getMonth()+1,0);
+  let h='',i=1;for(let w=first;w<=last;w=addDays(w,7),i++){const on=ui.mode==='week'&&iso(monday(a))===iso(w);h+=`<button data-w="${iso(w)}" class="${on?'on':''}" title="Неделя с ${w.getDate()} ${MON[w.getMonth()].toLowerCase()}">Н${i}</button>`}
+  $('#wk').innerHTML=h;
+  document.querySelectorAll('.tab').forEach(b=>b.setAttribute('aria-selected',b.dataset.t===ui.tab));
+}
+function periodBar(){
+  const d=range(),a=d[0],b=d[d.length-1];
+  const lbl=ui.mode==='month'?MON[ui.anchor.getMonth()]+' '+ui.anchor.getFullYear():`${a.getDate()} ${MON[a.getMonth()].toLowerCase()} – ${b.getDate()} ${MON[b.getMonth()].toLowerCase()}`;
+  return `<div class="bar"><button data-nav="-1" aria-label="Назад">‹</button><h2>${lbl}</h2><button data-nav="1" aria-label="Вперёд">›</button><button data-nav="0">Сегодня</button><span class="grow"></span>
+  <div class="seg">${[['week','Неделя'],['2w','2 недели'],['month','Месяц']].map(([k,l])=>`<button data-mode="${k}" class="${ui.mode===k?'on':''}">${l}</button>`).join('')}</div></div>`;
+}
+const chip=(r,m,from)=>`<span class="chip" draggable="${!m||ui.edit}" data-m="${m||''}" data-rid="${r.id}" ${from?`data-from="${from}"`:''}>${from&&r.img?`<img src="${esc(r.img)}" alt="" data-open="${r.id}">`:''}<span data-open="${r.id}">${esc(r.name)}</span>${from&&ui.edit?`<button class="x" data-rm="${from}" aria-label="Убрать">×</button>`:''}</span>`;
+
+function vPlan(){
+  const days=range(),today=iso(new Date()),mon=ui.anchor.getMonth(),list=shopping(days);
+  const total=list.reduce((s,v)=>s+(v.cost||0),0),miss=list.filter(v=>v.cost==null).length;
+  const rs=S.recipes.filter(r=>r.name.toLowerCase().includes(ui.q.toLowerCase()));
+  return `<div class="bar"><h1>Меню</h1><span class="grow"></span><button class="${ui.edit?'pri':''}" data-editplan>${ui.edit?'Сохранить и выйти':'Редактировать меню'}</button></div>${periodBar()}<div class="layout${ui.edit?' editing':''}"><div class="dscroll"><div class="days">${days.map(d=>{const k=iso(d),p=S.plan[k]||{};
+    return `<div class="day${k===today?' today':''}${ui.mode==='month'&&d.getMonth()!==mon?' out':''}"><div class="dh">${d.getDate()} <small>${WD[(d.getDay()+6)%7]}</small></div>
+    ${MEALS.map(([m,l,c])=>`<div class="ml"><i style="background:${c}"></i>${l}</div><div class="slot" data-slot="${k}|${m}">${(p[m]||[]).map((id,i)=>{const r=recipe(id);return r?chip(r,m,`${k}|${m}|${i}`):''}).join('')}${ui.edit?`<button class="add" data-pick="${k}|${m}" aria-label="Добавить ${l.toLowerCase()}">+</button>`:''}</div>`).join('')}</div>`}).join('')}</div></div>
+  <aside class="rail">${ui.edit?`<div class="box"><h2>Мои рецепты</h2><p class="meta">Перетащите на день или нажмите «+» в ячейке.</p>
+    <input id="q" placeholder="Поиск" value="${esc(ui.q)}" aria-label="Поиск рецепта" style="width:100%">
+    <div class="rlist">${rs.map(r=>chip(r)).join('')||'<span class="meta">Пока нет рецептов</span>'}</div>
+    <button class="pri" data-new style="margin-top:10px;width:100%">+ Новый рецепт</button></div>`:''}
+  <div class="box"><h2>Корзина на период</h2><div class="big">${money(total)}</div><p class="meta">Продуктов: ${list.length}${miss?`, без цены: ${miss}`:''}</p><button data-go="shop" style="width:100%">Открыть список покупок</button></div>
+  <p class="sv" id="sv">${esc(savedMsg)}</p></aside></div>`;
+}
+function vRecipes(){
+  return `<div class="bar"><h1>Рецепты</h1><span class="grow"></span><span class="st" id="nst"></span>${PWA?(S.recipes.length?'<button data-notion>Скопировать для Notion</button>':''):(n=>`<button data-notion ${n?'':'disabled'}>${n?`Выгрузить в Notion (${n})`:'Всё уже в Notion'}</button>`)(S.recipes.filter(r=>!r.notion).length)}<button class="pri" data-new>+ Новый рецепт</button></div>
+  ${S.recipes.length?[...CATS,''].map(c=>{const rs=S.recipes.filter(r=>(CATS.includes(r.cat)?r.cat:'')===c);return rs.length?`<h2 class="cat">${c||'Без категории'} <small>${rs.length}</small></h2><div class="cards">${rs.map(r=>`<button class="rc" data-open="${r.id}">${r.img?`<img src="${esc(r.img)}" alt="">`:''}<h2>${esc(r.name)}</h2><span class="meta">${r.time?esc(r.time)+' мин · ':''}${r.servings?esc(r.servings)+' порц. · ':''}${r.ingredients.length} ингр.</span><span class="meta">${esc(r.ingredients.slice(0,5).map(i=>i.name).join(', '))}</span></button>`).join('')}</div>`:''}).join('')
+  :'<div class="empty">Добавьте первый рецепт вручную или по ссылке.</div>'}`;
+}
+function vShop(){
+  const list=shopping(range()),total=list.reduce((s,v)=>s+(v.cost||0),0);
+  return `<h1>Список покупок</h1>${periodBar()}${list.length?`<div class="scroll"><table><thead><tr><th></th><th>Продукт</th><th class="num">Сколько</th><th class="num">Цена</th></tr></thead><tbody>
+  ${list.map(v=>`<tr class="${S.checked[v.key]?'done':''}"><td><input type="checkbox" data-chk="${esc(v.key)}" ${S.checked[v.key]?'checked':''} aria-label="Куплено: ${esc(v.name)}"></td><td><span class="nm">${esc(v.name)}</span><div class="meta">${esc([...v.from].join(', '))}</div></td><td class="num">${esc(fmtQty(v))}</td><td class="num">${v.cost==null?'<span class="meta">нет цены</span>':money(v.cost)}</td></tr>`).join('')}
+  </tbody><tfoot><tr><th></th><th>Итого</th><th></th><th class="num big" style="font-size:32px">${money(total)}</th></tr></tfoot></table></div>
+  <div class="bar" style="margin-top:12px"><button data-go="prices">Указать цены</button><button data-uncheck>Снять отметки</button></div>`
+  :'<div class="empty">На этот период в меню ничего нет. Добавьте блюда в планере.</div>'}`;
+}
+function vPrices(){
+  const names={};
+  for(const r of S.recipes)for(const i of r.ingredients){const n=(i.name||'').trim();if(n&&!names[n.toLowerCase()])names[n.toLowerCase()]={n,per:PER[(BASE[i.unit]||[])[0]]||'кг'}}
+  for(const [k,p] of Object.entries(S.prices))names[k]??={n:p.name||k,per:p.per};
+  const rows=Object.entries(names).sort((a,b)=>a[1].n.localeCompare(b[1].n,'ru'));
+  return `<div class="bar"><h1>Цены на продукты</h1><span class="grow"></span><label class="meta">Валюта <select id="cur">${[...new Set([S.currency,...CUR])].map(c=>`<option ${c===S.currency?'selected':''}>${esc(c)}</option>`).join('')}</select></label></div>
+  <p class="meta">Цена за кг, литр или штуку. Граммы и миллилитры пересчитываются сами; ложки и «по вкусу» в стоимость не входят.</p>
+  <div class="scroll"><table><thead><tr><th>Продукт</th><th class="num">Цена, ${esc(S.currency)}</th><th>за</th></tr></thead><tbody>
+  ${rows.map(([k,v])=>{const p=S.prices[k]||{};return `<tr><td class="nm">${esc(v.n)}</td><td class="num"><input inputmode="decimal" data-price="${esc(k)}" data-n="${esc(v.n)}" value="${p.price??''}" style="width:110px;text-align:right" aria-label="Цена: ${esc(v.n)}"></td><td><select data-per="${esc(k)}" data-n="${esc(v.n)}" aria-label="Единица цены">${['кг','л','шт'].map(u=>`<option ${(p.per||v.per)===u?'selected':''}>${u}</option>`).join('')}</select></td></tr>`}).join('')||'<tr><td colspan="3" class="meta">Продукты появятся из рецептов.</td></tr>'}
+  </tbody></table></div>
+  <form class="row" id="addp" style="margin-top:12px"><input name="n" placeholder="Новый продукт" aria-label="Новый продукт" required><button>Добавить</button></form>`;
+}
+function vSettings(){const t=S.settings||{};
+  return `<h1>Настройки</h1><form id="setf" style="display:grid;gap:12px;max-width:560px">
+  <label class="meta" style="display:grid;gap:3px">Ключ Claude API (для разбора рецептов по ссылке)<input name="claudeKey" type="password" autocomplete="off" value="${esc(t.claudeKey)}" placeholder="sk-ant-…"></label>
+  ${NATIVE?`<label class="meta" style="display:grid;gap:3px">Токен интеграции Notion<input name="notionToken" type="password" autocomplete="off" value="${esc(t.notionToken)}" placeholder="ntn_…"></label>
+  <label class="meta" style="display:grid;gap:3px">Ссылка на страницу Notion для рецептов<input name="notionPage" value="${esc(t.notionPage)}" placeholder="https://www.notion.so/…"></label>`:''}
+  <div class="row"><button class="pri">Сохранить</button><span class="st" id="sst"></span></div></form>
+  <p class="meta">Ключи хранятся только на этом телефоне.</p>`}
+function render(){
+  header();const v=$('#view');
+  v.innerHTML={plan:vPlan,recipes:vRecipes,shop:vShop,prices:vPrices,settings:vSettings}[ui.tab]();
+  setSaved(savedMsg);
+}
+
+// modals
+const ov=$('#ov'),dlg=$('#dlg');
+function open(html){dlg.innerHTML=html;ov.hidden=false;dlg.querySelector('input,button')?.focus()}
+function close(){ov.hidden=true;dlg.innerHTML=''}
+ov.addEventListener('click',e=>{if(e.target===ov)close()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!ov.hidden)close()});
+
+function showRecipe(id){const r=recipe(id);if(!r)return;
+  open(`${r.img?`<img class="hero" src="${esc(r.img)}" alt="">`:''}<div class="row"><h1 style="flex:1">${esc(r.name)}</h1><button data-close aria-label="Закрыть">×</button></div>
+  <div class="meta">${r.cat?`<b class="tag">${esc(r.cat)}</b> `:''}${r.time?esc(r.time)+' мин · ':''}${r.servings?esc(r.servings)+' порц.':''}${/^https:\/\//.test(r.source||'')?` · <a href="${esc(r.source)}" target="_blank" rel="noopener">источник</a>`:''}</div>
+  <h2>Ингредиенты</h2>${groups(r.ingredients).map(([g,is])=>`${g?`<h3>${esc(g)}</h3>`:''}<table>${is.map(i=>`<tr><td>${esc(i.name)}</td><td class="num">${esc(i.qty??'')} ${esc(i.unit)}</td></tr>`).join('')}</table>`).join('')}
+  ${r.steps?.length?`<h2>Как готовить</h2><ol>${r.steps.map(s=>`<li>${esc(s)}</li>`).join('')}</ol>`:''}
+  <div class="row"><button class="pri" data-edit="${r.id}">Изменить</button><button data-del="${r.id}">Удалить</button></div>`)}
+const NOTION_PARENT='4230afcb36d881779195dd7b9797172c'; // page "Рецепты из кулинарного планера" in momo's Notion
+const mdOf=r=>[[r.cat,r.time&&r.time+' мин',r.servings&&r.servings+' порц.'].filter(Boolean).join(' · '),'## Ингредиенты',
+  ...groups(r.ingredients).flatMap(([g,is])=>[g?'### '+g:'',...is.map(i=>`- ${i.name} — ${i.qty?i.qty+' ':''}${i.unit}`)]),
+  r.steps?.length?'## Как готовить':'',...(r.steps||[]).map((s,k)=>`${k+1}. ${s}`),/^https:\/\//.test(r.source||'')?`\n[Источник](${r.source})`:''].filter(Boolean).join('\n');
+const blocksOf=r=>mdOf(r).split('\n').filter(Boolean).slice(0,100).map(l=>{const [type,text]=l.startsWith('### ')?['heading_3',l.slice(4)]:l.startsWith('## ')?['heading_2',l.slice(3)]:l.startsWith('- ')?['bulleted_list_item',l.slice(2)]:/^\d+\. /.test(l)?['numbered_list_item',l.replace(/^\d+\. /,'')]:['paragraph',l];
+  return {object:'block',type,[type]:{rich_text:[{type:'text',text:{content:text.slice(0,1900)}}]}}});
+async function toNotion(btn){if(PWA){const st=$('#nst');try{await navigator.clipboard.writeText(S.recipes.map(r=>'# '+r.name+'\n'+mdOf(r)).join('\n\n---\n\n'));st.textContent='Скопировано. Вставь на страницу в Notion.'}catch{st.textContent='Не удалось скопировать'}return}
+  const rs=S.recipes.filter(r=>!r.notion),st=$('#nst');if(!rs.length)return;btn.disabled=true;st.classList.remove('err');
+  const T=S.settings||{},page=NATIVE?(String(T.notionPage||'').replace(/-/g,'').match(/[0-9a-f]{32}/i)||[])[0]:NOTION_PARENT;
+  try{if(NATIVE&&!(T.notionToken&&page))throw{code:'укажите токен и страницу Notion в «Настройках»'};
+    const mcp=NATIVE?null:await use('mcp');if(!NATIVE&&!mcp)throw{code:'Notion здесь недоступен'};
+    for(const [k,r] of rs.entries()){st.textContent=`Выгружаю ${k+1} из ${rs.length}…`;
+      if(NATIVE){const res=await http('https://api.notion.com/v1/pages',{method:'POST',headers:{Authorization:'Bearer '+T.notionToken,'Notion-Version':'2022-06-28','content-type':'application/json'},
+        body:JSON.stringify({parent:{page_id:page},properties:{title:{title:[{text:{content:r.name}}]}},children:blocksOf(r)})});
+        const b=JSON.parse(res.body);if(res.status!==200)throw{code:b.message||res.status};r.notion=b.url||'yes';save();continue}
+      const res=await mcp.callTool('Notion','notion-create-pages',{parent:{type:'page_id',page_id:NOTION_PARENT},allow_async:false,pages:[{properties:{title:r.name},content:mdOf(r)}]});
+      r.notion=res.payload?.pages?.[0]?.url||'yes';save()}
+    render();$('#nst').innerHTML=`Готово. <a href="https://www.notion.so/${page}" target="_blank" rel="noopener">Открыть в Notion</a>`}
+  catch(e){render();const n=$('#nst');n.textContent='Не получилось ('+(e.code||e.message||'ошибка')+')';n.classList.add('err')}}
+
+const ingRow=(i={})=>`<div class="ing"><input data-f="name" value="${esc(i.name)}" placeholder="Продукт" aria-label="Продукт"><input data-f="qty" inputmode="decimal" value="${esc(i.qty??'')}" placeholder="Кол-во" aria-label="Количество"><select data-f="unit" aria-label="Единица">${UNITS.map(u=>`<option ${u===(i.unit||'г')?'selected':''}>${u}</option>`).join('')}</select><button type="button" data-rmi aria-label="Удалить строку">×</button></div>`;
+const grpRow=g=>`<div class="grp"><input data-g value="${esc(g)}" placeholder="Раздел, например «Тесто» или «Начинка»" aria-label="Раздел ингредиентов"><button type="button" data-rmi aria-label="Удалить раздел">×</button></div>`;
+const ingRows=ings=>groups(ings).map(([g,is])=>(g?grpRow(g):'')+is.map(ingRow).join('')).join('');
+async function resize(file,max=900){const b=await createImageBitmap(file),k=Math.min(1,max/Math.max(b.width,b.height)),c=document.createElement('canvas');c.width=b.width*k;c.height=b.height*k;c.getContext('2d').drawImage(b,0,0,c.width,c.height);return new Promise(r=>c.toBlob(r,'image/jpeg',.85))}
+function editRecipe(id){const r=recipe(id)||{id:'',name:'',cat:'',img:'',servings:2,time:'',ingredients:[{},{},{}],steps:[],source:''};
+  open(`<div class="row"><h1 style="flex:1">${id?'Изменить рецепт':'Новый рецепт'}</h1><button type="button" data-close aria-label="Закрыть">×</button></div>
+  ${id?'':`<div class="imp"><b>Импорт по ссылке</b><input id="iurl" type="url" placeholder="https://youtube.com/… или сайт с рецептом" aria-label="Ссылка на рецепт">
+  <textarea id="itxt" rows="3" placeholder="Или вставьте текст рецепта / описание под видео"  aria-label="Текст рецепта"></textarea>
+  <div class="row"><button type="button" class="pri" id="ibtn">Разобрать рецепт</button><span class="st" id="ist"></span></div></div>`}
+  <form id="rf" style="display:grid;gap:10px"><div class="row"><label>Название<input name="name" required value="${esc(r.name)}"></label><label style="flex:0 1 110px">Порций<input name="servings" inputmode="numeric" value="${esc(r.servings)}"></label><label style="flex:0 1 110px">Минут<input name="time" inputmode="numeric" value="${esc(r.time)}"></label></div>
+  <div class="row"><label>Категория<select name="cat"><option value="">Без категории</option>${CATS.map(c=>`<option ${c===r.cat?'selected':''}>${c}</option>`).join('')}</select></label>
+  <label>Картинка<input type="file" accept="image/*" id="imgf"></label><input type="hidden" name="img" value="${esc(r.img)}"><img id="imgp" class="thumb" src="${esc(r.img)}" alt="" ${r.img?'':'hidden'}></div><span class="st" id="imgs"></span>
+  <div><h2>Ингредиенты</h2><div id="ings">${ingRows(r.ingredients)}</div><div class="row"><button type="button" data-addi>+ строка</button><button type="button" data-addg>+ раздел</button></div></div>
+  <label class="meta" style="display:grid;gap:3px">Шаги приготовления (каждый с новой строки)<textarea name="steps" rows="5">${esc((r.steps||[]).join('\n'))}</textarea></label>
+  <label class="meta" style="display:grid;gap:3px">Источник<input name="source" value="${esc(r.source)}"></label>
+  <div class="row"><button class="pri">Сохранить рецепт</button><button type="button" data-close>Отмена</button></div></form>`);
+  $('#rf').onsubmit=e=>{e.preventDefault();const f=new FormData(e.target);
+    let g='';const ings=[...$('#ings').children].map(x=>{if(x.classList.contains('grp')){g=x.querySelector('[data-g]').value.trim();return null}
+      return {name:x.querySelector('[data-f=name]').value.trim(),qty:x.querySelector('[data-f=qty]').value.trim(),unit:x.querySelector('[data-f=unit]').value,...(g?{g}:{})}}).filter(i=>i?.name);
+    const n={id:r.id||uid(),name:f.get('name').trim(),cat:f.get('cat'),img:f.get('img'),servings:f.get('servings'),time:f.get('time'),ingredients:ings,steps:f.get('steps').split('\n').map(s=>s.trim()).filter(Boolean),source:f.get('source').trim()};
+    const i=S.recipes.findIndex(x=>x.id===n.id);i<0?S.recipes.push(n):S.recipes[i]=n;save();close();render()};
+  const ib=$('#ibtn');if(ib)ib.onclick=()=>doImport();
+  $('#imgf').onchange=async e=>{const file=e.target.files[0];if(!file)return;const st=$('#imgs');st.textContent='Загружаю картинку…';
+    try{const assets=LOCAL?null:await use('assets'),blob=await resize(file,assets?900:600);
+      const url=assets?(await assets.upload(blob)).url:await new Promise((ok,no)=>{const fr=new FileReader();fr.onload=()=>ok(fr.result);fr.onerror=no;fr.readAsDataURL(blob)});
+      $('#rf').img.value=url;$('#imgp').src=url;$('#imgp').hidden=false;st.textContent=''}
+    catch(err){st.textContent='Картинка не загрузилась ('+(err.code||err.message||'ошибка')+')'}};
+}
+function fillForm(j,url){const f=$('#rf');f.name.value=j.name||'';f.servings.value=j.servings||'';f.time.value=j.time||'';f.steps.value=(j.steps||[]).join('\n');f.source.value=url||'';f.cat.value=CATS.includes(j.category)?j.category:'';
+  $('#ings').innerHTML=ingRows((j.ingredients||[]).map(i=>({name:i.name,qty:i.qty??'',unit:UNITS.includes(i.unit)?i.unit:'шт',g:i.group||''})))}
+const PROMPT=`Разбери рецепт из источника ниже. Ответь только JSON без пояснений:
+{"name":string,"category":string,"servings":number|null,"time":number|null (минуты),"ingredients":[{"group":string|null,"name":string,"qty":number|null,"unit":string}],"steps":[string]}
+Правила: всё на русском (переведи при необходимости). category строго одно из: ${CATS.join(', ')}. group — раздел ингредиента, если в рецепте они делятся (например "Тесто", "Опара", "Начинка", "Соус", "Крем"), иначе null; ингредиенты одного раздела идут подряд. name ингредиента короткий, в именительном падеже, без количества (например "куриное филе"). unit строго одно из: ${UNITS.join(', ')}. Переводи меры: cup→мл (240), oz→г (28), lb→г (454), tbsp→ст.л., tsp→ч.л., зубчик/пучок/банка→шт. Шаги короткие. Если рецепта в источнике нет, верни {"error":"причина"}.
+
+Источник:
+`;
+const API='https://api.anthropic.com/v1/messages';
+async function claudeDirect(prompt,url){const key=S.settings?.claudeKey;if(!key)throw{msg:'Добавьте ключ Claude API во вкладке «Настройки» или заполните рецепт вручную.'};
+  const headers={'x-api-key':key,'anthropic-version':'2023-06-01','content-type':'application/json','anthropic-beta':'server-side-fallback-2026-07-01','anthropic-dangerous-direct-browser-access':'true'};
+  const messages=[{role:'user',content:prompt+(url?`\n\nОткрой страницу инструментом web_fetch и возьми рецепт оттуда (для YouTube — из названия и описания): ${url}`:'')}];
+  for(let i=0;i<4;i++){
+    const body=JSON.stringify({model:'claude-opus-5-5',max_tokens:16000,output_config:{effort:'low'},fallbacks:'default',messages,...(url?{tools:[{type:'web_fetch_20260209',name:'web_fetch',max_uses:2,max_content_tokens:30000}]}:{})});
+    const r=NATIVE?await http(API,{method:'POST',headers,body}):await fetch(API,{method:'POST',headers,body}).then(async x=>({status:x.status,body:await x.text()}));
+    let t;try{t=JSON.parse(r.body)}catch{throw{msg:'Claude ответил странно ('+r.status+')'}}
+    if(r.status!==200)throw{msg:'Claude: '+(t.error?.message||r.status)};
+    if(t.stop_reason==='pause_turn'){messages.push({role:'assistant',content:t.content});continue}
+    if(t.stop_reason==='refusal')throw{msg:'Claude не стал разбирать этот текст'};
+    const x=t.content.filter(c=>c.type==='text').map(c=>c.text).join('');return JSON.parse(x.slice(x.indexOf('{'),x.lastIndexOf('}')+1))}
+  throw{msg:'Claude не успел разобрать страницу, попробуйте ещё раз'}}
+async function doImport(){
+  const url=$('#iurl').value.trim(),txt=$('#itxt').value.trim(),st=$('#ist'),btn=$('#ibtn');
+  const say=(t,err)=>{st.textContent=t;st.classList.toggle('err',!!err)};
+  if(!url&&!txt)return say('Вставьте ссылку или текст рецепта',1);
+  btn.disabled=true;
+  try{
+    let src=txt;
+    if(url){
+      if(!/^https?:\/\//.test(url))throw{msg:'Ссылка должна начинаться с https://'};
+      if(LOCAL){}
+      else{const mcp=await use('mcp');
+      if(mcp){say('Открываю страницу…');
+        try{const r=await mcp.callTool('Firecrawl','firecrawl_scrape',{url,formats:['markdown'],onlyMainContent:true,objective:'Extract a cooking recipe (ingredients with amounts, steps) from this page'});
+          src=(typeof r.payload==='string'?r.payload:JSON.stringify(r.payload??r.content)).slice(0,40000)+(txt?'\n\n'+txt:'')}
+        catch(e){if(!txt)throw{msg:'Не удалось открыть ссылку ('+(e.code||'ошибка')+'). Вставьте текст рецепта в поле выше.'}}
+      }else if(!txt)throw{msg:'Чтение ссылок здесь недоступно. Вставьте текст рецепта в поле выше.'};}
+    }
+    const sample=LOCAL?null:await use('sample');if(!LOCAL&&!sample)throw{msg:'Разбор через Claude здесь недоступен. Заполните рецепт вручную.'};
+    say('Claude разбирает рецепт… (до минуты)');
+    const j=LOCAL?await claudeDirect(PROMPT+src,url):await sample.json(PROMPT+src);
+    if(!j||j.error)throw{msg:'Рецепт не найден: '+(j?.error||'пустой ответ')+'. Для видео вставьте описание или расшифровку.'};
+    fillForm(j,url);say('Готово, проверьте и сохраните');
+  }catch(e){say(e.msg||('Не получилось: '+(e.code||e.message||'ошибка')),1)}
+  btn.disabled=false;
+}
+function pick(slot){
+  open(`<div class="row"><h1 style="flex:1">Выберите блюдо</h1><button data-close aria-label="Закрыть">×</button></div>
+  <div class="rlist" style="max-height:60vh">${S.recipes.map(r=>`<button data-put="${slot}|${r.id}">${esc(r.name)}</button>`).join('')||'<span class="meta">Сначала добавьте рецепт.</span>'}</div><button class="pri" data-new>+ Новый рецепт</button>`)}
+
+const slotArr=(k,m)=>((S.plan[k]??={})[m]??=[]);
+function removeAt(from){const [k,m,i]=from.split('|');S.plan[k]?.[m]?.splice(+i,1)}
+
+// events
+document.addEventListener('click',e=>{const t=e.target.closest('button,[data-open]');if(!t)return;const d=t.dataset;
+  if(d.t){ui.tab=d.t;render()}
+  else if(d.w){ui.mode='week';ui.anchor=new Date(d.w+'T12:00');ui.tab=ui.tab==='shop'?'shop':'plan';render()}
+  else if(d.nav){const n=+d.nav;ui.anchor=n===0?new Date():ui.mode==='month'?new Date(ui.anchor.getFullYear(),ui.anchor.getMonth()+n,1):addDays(ui.anchor,n*(ui.mode==='2w'?14:7));render()}
+  else if(d.mode){ui.mode=d.mode;render()}
+  else if(d.go){ui.tab=d.go;render()}
+  else if(d.rm){removeAt(d.rm);save();render()}
+  else if(d.pick)pick(d.pick);
+  else if(d.put){const [k,m,id]=d.put.split('|');slotArr(k,m).push(id);save();close();render()}
+  else if(d.new!==undefined)editRecipe('');
+  else if(d.edit)editRecipe(d.edit);
+  else if(d.notion!==undefined)toNotion(t);
+  else if(d.editplan!==undefined){ui.edit=!ui.edit;if(!ui.edit)save();render()}
+  else if(d.del){if(t.textContent!=='Точно удалить?'){t.textContent='Точно удалить?';return}
+    S.recipes=S.recipes.filter(r=>r.id!==d.del);for(const p of Object.values(S.plan))for(const m in p)p[m]=p[m].filter(x=>x!==d.del);save();close();render()}
+  else if(d.close!==undefined)close();
+  else if(d.addi!==undefined)$('#ings').insertAdjacentHTML('beforeend',ingRow());
+  else if(d.addg!==undefined){$('#ings').insertAdjacentHTML('beforeend',grpRow('')+ingRow());[...$('#ings').querySelectorAll('[data-g]')].at(-1).focus()}
+  else if(d.rmi!==undefined)t.parentElement.remove();
+  else if(d.uncheck!==undefined){S.checked={};save();render()}
+  else if(d.open)showRecipe(d.open);
+});
+document.addEventListener('input',e=>{const t=e.target;
+  if(t.id==='q'){ui.q=t.value;const p=t.selectionStart;render();const q=$('#q');q.focus();q.setSelectionRange(p,p)}
+});
+document.addEventListener('change',e=>{const t=e.target,d=t.dataset;
+  if(d.chk){S.checked[d.chk]=t.checked;save();render()}
+  else if(d.price!==undefined||d.per!==undefined){const k=d.price??d.per,row=t.closest('tr');const v=num(row.querySelector('[data-price]').value);
+    S.prices[k]={name:d.n,price:isNaN(v)?null:v,per:row.querySelector('[data-per]').value};save()}
+  else if(t.id==='cur'){S.currency=t.value;save();render()}
+});
+document.addEventListener('submit',e=>{if(e.target.id==='setf'){e.preventDefault();S.settings=Object.fromEntries(new FormData(e.target));save();$('#sst').textContent='Сохранено';return}
+  if(e.target.id!=='addp')return;e.preventDefault();const n=e.target.n.value.trim();if(!n)return;S.prices[n.toLowerCase()]??={name:n,price:null,per:'кг'};save();render()});
+// drag & drop
+document.addEventListener('dragstart',e=>{const c=e.target.closest?.('.chip');if(!c)return;e.dataTransfer.setData('text/plain',JSON.stringify({rid:c.dataset.rid,from:c.dataset.from||''}));e.dataTransfer.effectAllowed='copyMove'});
+document.addEventListener('dragover',e=>{const s=e.target.closest?.('.slot');if(!s||!ui.edit)return;e.preventDefault();s.classList.add('over')});
+document.addEventListener('dragleave',e=>e.target.closest?.('.slot')?.classList.remove('over'));
+document.addEventListener('drop',e=>{const s=e.target.closest?.('.slot');if(!s||!ui.edit)return;e.preventDefault();
+  let p;try{p=JSON.parse(e.dataTransfer.getData('text/plain'))}catch{return}
+  if(!recipe(p.rid))return;const [k,m]=s.dataset.slot.split('|');
+  if(p.from&&!e.altKey)removeAt(p.from); // Alt = copy instead of move
+  slotArr(k,m).push(p.rid);save();render()});
+
+async function boot(){
+  if(LOCAL)$('#tset').hidden=false;
+  if(NATIVE){if(window.__STATE__)S={...S,...window.__STATE__};render();savedMsg='Данные хранятся на телефоне';return setSaved(savedMsg)}
+  try{const l=localStorage.getItem('cooking-planner');if(l)S={...S,...JSON.parse(l)}}catch{}
+  render();
+  db=await use('db');
+  if(!db){savedMsg='Сохраняется только в этом браузере';return setSaved(savedMsg)}
+  // shortcut: server copy wins on load; edits made in the first second could be overwritten (single-user app)
+  try{const s=await db.doc('planner/state').get();if(s.exists)S={...S,...JSON.parse(s.data().json)};savedMsg='Синхронизировано';render()}
+  catch(e){savedMsg='Хранилище недоступно, работаю с копией в браузере';setSaved(savedMsg)}
+}
+boot();
+}
+</script>
+
+</body></html>
