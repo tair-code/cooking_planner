@@ -120,7 +120,7 @@ ol{padding-left:20px;margin:0}
     <button class="tab" data-t="recipes" role="tab">Рецепты</button>
     <button class="tab" data-t="shop" role="tab">Покупки</button>
     <button class="tab" data-t="prices" role="tab">Цены</button>
-    <button class="tab" data-t="settings" role="tab" id="tset" hidden>Настройки</button>
+    <button class="tab" data-t="settings" role="tab" id="tset">Настройки</button>
   </nav>
   <div>
     <div class="date"><b id="mon"></b><span id="dnum"></span></div>
@@ -254,12 +254,19 @@ function vPrices(){
   <form class="row" id="addp" style="margin-top:12px"><input name="n" placeholder="Новый продукт" aria-label="Новый продукт" required><button>Добавить</button></form>`;
 }
 function vSettings(){const t=S.settings||{};
-  return `<h1>Настройки</h1><form id="setf" style="display:grid;gap:12px;max-width:560px">
+  return `<h1>Настройки</h1>${vBackup()}${LOCAL?`<form id="setf" style="display:grid;gap:12px;max-width:560px">
   <label class="meta" style="display:grid;gap:3px">Ключ Claude API (для разбора рецептов по ссылке)<input name="claudeKey" type="password" autocomplete="off" value="${esc(t.claudeKey)}" placeholder="sk-ant-…"></label>
   ${NATIVE?`<label class="meta" style="display:grid;gap:3px">Токен интеграции Notion<input name="notionToken" type="password" autocomplete="off" value="${esc(t.notionToken)}" placeholder="ntn_…"></label>
   <label class="meta" style="display:grid;gap:3px">Ссылка на страницу Notion для рецептов<input name="notionPage" value="${esc(t.notionPage)}" placeholder="https://www.notion.so/…"></label>`:''}
   <div class="row"><button class="pri">Сохранить</button><span class="st" id="sst"></span></div></form>
-  <p class="meta">Ключи хранятся только на этом телефоне.</p>`}
+  <p class="meta">Ключи хранятся только на этом устройстве и не попадают в резервную копию.</p>`:''}`}
+function vBackup(){return `<section style="display:grid;gap:10px;max-width:560px;margin-bottom:24px"><h2>Резервная копия</h2>
+  <p class="meta">${PWA?'Все рецепты, планер и цены хранятся в этом браузере. Скачай копию и положи файл в Notion: перетащи его на любую страницу.':'Сохраняет все рецепты, планер и цены отдельной страницей в Notion, в «Рецепты из кулинарного планера».'}</p>
+  <div class="row"><button class="pri" data-bk>${PWA?'Скачать копию':'Сохранить копию в Notion'}</button><span class="st" id="bst"></span></div>
+  <p class="meta">Восстановить: ${PWA?'выбери файл копии или вставь':'вставь'} её текст ниже. Текущие данные заменятся.</p>
+  ${PWA?'<input type="file" id="rsf" accept=".json,application/json">':''}
+  <textarea id="rst" rows="3" placeholder="Вставь текст копии"></textarea>
+  <div class="row"><button data-rs>Восстановить</button><span class="st" id="rss"></span></div></section>`}
 function render(){
   header();const v=$('#view');
   v.innerHTML={plan:vPlan,recipes:vRecipes,shop:vShop,prices:vPrices,settings:vSettings}[ui.tab]();
@@ -299,6 +306,19 @@ async function toNotion(btn){if(PWA){const st=$('#nst');try{await navigator.clip
     render();$('#nst').innerHTML=`Готово. <a href="https://www.notion.so/${page}" target="_blank" rel="noopener">Открыть в Notion</a>`}
   catch(e){render();const n=$('#nst');n.textContent='Не получилось ('+(e.code||e.message||'ошибка')+')';n.classList.add('err')}}
 
+// Backup = whole state except settings (API keys stay on the device).
+const backupJSON=()=>{const {settings,...d}=S;return JSON.stringify({app:'cooking-planner',at:new Date().toISOString(),...d})};
+async function backup(btn){const st=$('#bst');st.classList.remove('err');
+  try{if(PWA){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([backupJSON()],{type:'application/json'}));a.download='planner-backup-'+new Date().toISOString().slice(0,10)+'.json';a.click();st.textContent='Файл скачан';return}
+    const mcp=await use('mcp');if(!mcp)throw{code:'Notion здесь недоступен'};btn.disabled=true;st.textContent='Сохраняю…';
+    // shortcut: whole state in one code block; fine for text recipes, split it if backups grow past Notion limits.
+    const res=await mcp.callTool('Notion','notion-create-pages',{parent:{type:'page_id',page_id:NOTION_PARENT},allow_async:false,pages:[{properties:{title:'Резервная копия планера '+new Date().toLocaleString('ru')},content:'```json\n'+backupJSON()+'\n```'}]});
+    const u=res.payload?.pages?.[0]?.url;st.innerHTML='Сохранено в Notion.'+(u?` <a href="${esc(u)}" target="_blank" rel="noopener">Открыть</a>`:'')}
+  catch(e){st.classList.add('err');st.textContent='Не получилось ('+(e.code||e.message||'ошибка')+')'}finally{btn.disabled=false}}
+function restore(btn){const st=$('#rss'),txt=$('#rst').value;st.classList.remove('err');
+  let d;try{d=JSON.parse(txt.slice(txt.indexOf('{'),txt.lastIndexOf('}')+1));if(!Array.isArray(d.recipes))throw 0}catch{st.classList.add('err');st.textContent='Это не похоже на копию планера';return}
+  if(btn.textContent!=='Точно заменить?'){btn.textContent='Точно заменить?';st.textContent=`В копии ${d.recipes.length} рецептов`;return}
+  delete d.app;delete d.at;S={...S,...d,settings:S.settings};save();render();$('#rss').textContent='Восстановлено'}
 const ingRow=(i={})=>`<div class="ing"><input data-f="name" value="${esc(i.name)}" placeholder="Продукт" aria-label="Продукт"><input data-f="qty" inputmode="decimal" value="${esc(i.qty??'')}" placeholder="Кол-во" aria-label="Количество"><select data-f="unit" aria-label="Единица">${UNITS.map(u=>`<option ${u===(i.unit||'г')?'selected':''}>${u}</option>`).join('')}</select><button type="button" data-rmi aria-label="Удалить строку">×</button></div>`;
 const grpRow=g=>`<div class="grp"><input data-g value="${esc(g)}" placeholder="Раздел, например «Тесто» или «Начинка»" aria-label="Раздел ингредиентов"><button type="button" data-rmi aria-label="Удалить раздел">×</button></div>`;
 const ingRows=ings=>groups(ings).map(([g,is])=>(g?grpRow(g):'')+is.map(ingRow).join('')).join('');
@@ -400,6 +420,8 @@ document.addEventListener('click',e=>{const t=e.target.closest('button,[data-ope
   else if(d.new!==undefined)editRecipe('');
   else if(d.edit)editRecipe(d.edit);
   else if(d.notion!==undefined)toNotion(t);
+  else if(d.bk!==undefined)backup(t);
+  else if(d.rs!==undefined)restore(t);
   else if(d.editplan!==undefined){ui.edit=!ui.edit;if(!ui.edit)save();render()}
   else if(d.del){if(t.textContent!=='Точно удалить?'){t.textContent='Точно удалить?';return}
     S.recipes=S.recipes.filter(r=>r.id!==d.del);for(const p of Object.values(S.plan))for(const m in p)p[m]=p[m].filter(x=>x!==d.del);save();close();render()}
@@ -418,6 +440,7 @@ document.addEventListener('change',e=>{const t=e.target,d=t.dataset;
   else if(d.price!==undefined||d.per!==undefined){const k=d.price??d.per,row=t.closest('tr');const v=num(row.querySelector('[data-price]').value);
     S.prices[k]={name:d.n,price:isNaN(v)?null:v,per:row.querySelector('[data-per]').value};save()}
   else if(t.id==='cur'){S.currency=t.value;save();render()}
+  else if(t.id==='rsf'&&t.files[0])t.files[0].text().then(x=>{$('#rst').value=x;$('[data-rs]').click()});
 });
 document.addEventListener('submit',e=>{if(e.target.id==='setf'){e.preventDefault();S.settings=Object.fromEntries(new FormData(e.target));save();$('#sst').textContent='Сохранено';return}
   if(e.target.id!=='addp')return;e.preventDefault();const n=e.target.n.value.trim();if(!n)return;S.prices[n.toLowerCase()]??={name:n,price:null,per:'кг'};save();render()});
@@ -437,7 +460,6 @@ function seed(){const done=new Set(S.seeded||[]);let n=0;
   for(const r of SEED){if(done.has(r.id))continue;done.add(r.id);if(!recipe(r.id)){S.recipes.push(structuredClone(r));n++}}
   S.seeded=[...done];if(n)save();return n}
 async function boot(){
-  if(LOCAL)$('#tset').hidden=false;
   if(NATIVE){if(window.__STATE__)S={...S,...window.__STATE__};seed();render();savedMsg='Данные хранятся на телефоне';return setSaved(savedMsg)}
   try{const l=localStorage.getItem('cooking-planner');if(l)S={...S,...JSON.parse(l)}}catch{}
   if(LOCAL)seed();
