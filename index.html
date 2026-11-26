@@ -307,6 +307,7 @@ function editRecipe(id){const r=recipe(id)||{id:'',name:'',cat:'',img:'',serving
   open(`<div class="row"><h1 style="flex:1">${id?'Изменить рецепт':'Новый рецепт'}</h1><button type="button" data-close aria-label="Закрыть">×</button></div>
   ${id?'':`<div class="imp"><b>Импорт по ссылке</b><input id="iurl" type="url" placeholder="https://youtube.com/… или сайт с рецептом" aria-label="Ссылка на рецепт">
   <textarea id="itxt" rows="3" placeholder="Или вставьте текст рецепта / описание под видео"  aria-label="Текст рецепта"></textarea>
+  <label class="meta" style="display:grid;gap:3px">Или фото рецепта (можно несколько страниц)<input type="file" id="iphoto" accept="image/*" multiple></label>
   <div class="row"><button type="button" class="pri" id="ibtn">Разобрать рецепт</button><span class="st" id="ist"></span></div></div>`}
   <form id="rf" style="display:grid;gap:10px"><div class="row"><label>Название<input name="name" required value="${esc(r.name)}"></label><label style="flex:0 1 110px">Порций<input name="servings" inputmode="numeric" value="${esc(r.servings)}"></label><label style="flex:0 1 110px">Минут<input name="time" inputmode="numeric" value="${esc(r.time)}"></label></div>
   <div class="row"><label>Категория<select name="cat"><option value="">Без категории</option>${CATS.map(c=>`<option ${c===r.cat?'selected':''}>${c}</option>`).join('')}</select></label>
@@ -336,9 +337,11 @@ const PROMPT=`Разбери рецепт из источника ниже. От
 Источник:
 `;
 const API='https://api.anthropic.com/v1/messages';
-async function claudeDirect(prompt,url){const key=S.settings?.claudeKey;if(!key)throw{msg:'Добавьте ключ Claude API во вкладке «Настройки» или заполните рецепт вручную.'};
+async function claudeDirect(prompt,url,imgs=[]){const key=S.settings?.claudeKey;if(!key)throw{msg:'Добавьте ключ Claude API во вкладке «Настройки» или заполните рецепт вручную.'};
   const headers={'x-api-key':key,'anthropic-version':'2023-06-01','content-type':'application/json','anthropic-beta':'server-side-fallback-2026-07-01','anthropic-dangerous-direct-browser-access':'true'};
-  const messages=[{role:'user',content:prompt+(url?`\n\nОткрой страницу инструментом web_fetch и возьми рецепт оттуда (для YouTube — из названия и описания): ${url}`:'')}];
+  const b64=await Promise.all(imgs.map(b=>new Promise((ok,no)=>{const fr=new FileReader();fr.onload=()=>ok(fr.result.split(',')[1]);fr.onerror=no;fr.readAsDataURL(b)})));
+  const text=prompt+(url?`\n\nОткрой страницу инструментом web_fetch и возьми рецепт оттуда (для YouTube — из названия и описания): ${url}`:'');
+  const messages=[{role:'user',content:b64.length?[...b64.map(data=>({type:'image',source:{type:'base64',media_type:'image/jpeg',data}})),{type:'text',text}]:text}];
   for(let i=0;i<4;i++){
     const body=JSON.stringify({model:'claude-opus-5-5',max_tokens:16000,output_config:{effort:'low'},fallbacks:'default',messages,...(url?{tools:[{type:'web_fetch_20260209',name:'web_fetch',max_uses:2,max_content_tokens:30000}]}:{})});
     const r=NATIVE?await http(API,{method:'POST',headers,body}):await fetch(API,{method:'POST',headers,body}).then(async x=>({status:x.status,body:await x.text()}));
@@ -351,7 +354,8 @@ async function claudeDirect(prompt,url){const key=S.settings?.claudeKey;if(!key)
 async function doImport(){
   const url=$('#iurl').value.trim(),txt=$('#itxt').value.trim(),st=$('#ist'),btn=$('#ibtn');
   const say=(t,err)=>{st.textContent=t;st.classList.toggle('err',!!err)};
-  if(!url&&!txt)return say('Вставьте ссылку или текст рецепта',1);
+  const photos=[...($('#iphoto')?.files||[])];
+  if(!url&&!txt&&!photos.length)return say('Вставьте ссылку, текст или фото рецепта',1);
   btn.disabled=true;
   try{
     let src=txt;
@@ -367,7 +371,10 @@ async function doImport(){
     }
     const sample=LOCAL?null:await use('sample');if(!LOCAL&&!sample)throw{msg:'Разбор через Claude здесь недоступен. Заполните рецепт вручную.'};
     say('Claude разбирает рецепт… (до минуты)');
-    const j=LOCAL?await claudeDirect(PROMPT+src,url):await sample.json(PROMPT+src);
+    const imgs=await Promise.all(photos.map(f=>resize(f,1600)));
+    if(imgs.length&&!LOCAL&&!(await sample.limits?.())?.images)throw{msg:'Разбор фото здесь недоступен. Вставьте текст рецепта.'};
+    const P=PROMPT+(imgs.length?'(рецепт на приложенных фото; распознай текст)\n':'')+src;
+    const j=LOCAL?await claudeDirect(P,url,imgs):await sample.json(P,imgs.length?{images:imgs}:undefined);
     if(!j||j.error)throw{msg:'Рецепт не найден: '+(j?.error||'пустой ответ')+'. Для видео вставьте описание или расшифровку.'};
     fillForm(j,url);say('Готово, проверьте и сохраните');
   }catch(e){say(e.msg||('Не получилось: '+(e.code||e.message||'ошибка')),1)}
